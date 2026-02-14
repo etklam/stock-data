@@ -1,0 +1,150 @@
+# 數據庫配置
+# 注意：敏感信息（特別是 password）建議通過 .env 文件設置環境變數覆蓋
+database:
+  host: localhost
+  port: 5432
+  name: stocks_data
+  user: postgres
+  password: CHANGE_ME_OR_USE_ENV_VAR  # 請通過 .env 設置 DATABASE_PASSWORD 環境變數
+
+# Yahoo Finance 配置
+yahoo_finance:
+  # 股票分類配置
+  categories:
+    # 按行業分類
+    industry:
+      technology:
+        name: "科技業"
+        symbols:
+          - AAPL  # Apple
+          - MSFT  # Microsoft
+          - GOOGL # Alphabet
+          - META  # Meta
+          - NVDA  # NVIDIA
+          - 2454.TW  # 聯發科
+      
+      healthcare:
+        name: "醫療保健"
+        symbols:
+          - JNJ  # Johnson & Johnson
+          - PFE  # Pfizer
+          - UNH  # UnitedHealth Group
+      
+      finance:
+        name: "金融業"
+        symbols:
+          - JPM  # JPMorgan Chase
+          - BAC  # Bank of America
+          - GS   # Goldman Sachs
+      
+      consumer:
+        name: "消費品"
+        symbols:
+          - AMZN  # Amazon
+          - TSLA  # Tesla
+          - HD    # Home Depot
+      
+      energy:
+        name: "能源業"
+        symbols:
+          - XOM  # ExxonMobil
+          - CVX  # Chevron
+    
+    # 按地區分類
+    region:
+      us_market:
+        name: "美國市場"
+        symbols:
+          - AAPL  # Apple
+          - MSFT  # Microsoft
+          - GOOGL # Alphabet
+          - AMZN  # Amazon
+          - TSLA  # Tesla
+          - META  # Meta
+          - NVDA  # NVIDIA
+          - JNJ   # Johnson & Johnson
+          - JPM   # JPMorgan Chase
+      
+      taiwan_market:
+        name: "台灣市場"
+        symbols:
+          - 2330.TW  # 台積電
+          - 2317.TW  # 鴻海
+          - 2454.TW  # 聯發科
+          - 2382.TW  # 台灣積電
+          - 3008.TW  # 大立光
+    
+    # 按市值分類
+    market_cap:
+      large_cap:
+        name: "大型股"
+        symbols:
+          - AAPL  # Apple
+          - MSFT  # Microsoft
+          - GOOGL # Alphabet
+          - AMZN  # Amazon
+          - TSLA  # Tesla
+          - META  # Meta
+          - NVDA  # NVIDIA
+          - 2330.TW  # 台積電
+      
+      mid_cap:
+        name: "中型股"
+        symbols:
+          - 2317.TW  # 鴻海
+          - 2454.TW  # 聯發科
+          - JNJ     # Johnson & Johnson
+          - JPM     # JPMorgan Chase
+      
+      small_cap:
+        name: "小型股"
+        symbols:
+          - 2382.TW  # 台灣積電
+          - 3008.TW  # 大立光
+  
+  # 數據獲取間隔（秒）
+  fetch_interval: 300
+  
+  # 歷史數據起始日期
+  start_date: "2020-01-01"
+  
+  # 啟用的分類類型（可選：industry, region, market_cap, custom）
+  enabled_category_types:
+    - industry
+    - region
+    - market_cap
+
+# 調度器配置
+scheduler:
+  # 每日數據獲取時間（24小時制）
+  daily_fetch_time: "18:00"
+  
+  # 是否啟用定時任務
+  enabled: true
+  
+  # 任務重試次數
+  max_retries: 3
+  
+  # 重試間隔（秒）
+  retry_interval: 60
+
+# 日誌配置
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: logs/stocks_data.log
+  max_size: 10485760  # 10MB
+  backup_count: 5
+
+# 應用配置
+app:
+  name: "Stock Data System"
+  version: "1.0.0"
+  debug: false
+
+# API 服務器配置
+api:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true
+  workers: 1
