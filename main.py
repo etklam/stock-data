@@ -236,8 +236,10 @@ def start_api_server(host=None, port=None, reload=None, workers=None):
         logger.info(f"ReDoc: http://{api_host}:{api_port}/redoc")
         
         # 啟動服務器
+        # reload 模式需要使用 import string
+        app_str = 'api_server:app' if api_reload else app
         run(
-            app,
+            app_str,
             host=api_host,
             port=api_port,
             reload=api_reload,
@@ -253,6 +255,14 @@ def start_api_server(host=None, port=None, reload=None, workers=None):
 def main():
     """主函數"""
     parser = argparse.ArgumentParser(description='股票數據獲取系統')
+    
+    # 全局參數
+    parser.add_argument('--config', default='config.yaml', help='指定配置文件路徑')
+    parser.add_argument('--init', action='store_true', help='初始化系統')
+    parser.add_argument('--historical', nargs='*', help='獲取歷史數據，可指定股票代碼')
+    parser.add_argument('--daily', nargs='*', help='獲取每日數據，可指定股票代碼')
+    parser.add_argument('--update-info', nargs='*', help='更新股票信息，可指定股票代碼')
+    parser.add_argument('--daemon', action='store_true', help='以守護進程模式運行')
     
     # 創建子命令
     subparsers = parser.add_subparsers(dest='command', help='可用命令')
@@ -273,14 +283,7 @@ def main():
     api_parser.add_argument('--no-reload', action='store_true', help='禁用重載')
     api_parser.add_argument('--workers', type=int, default=None, help='指定工作進程數')
     
-    # 全局參數
-    parser.add_argument('--config', default='config.yaml', help='指定配置文件路徑')
-    
     args = parser.parse_args()
-    
-    # 如果沒有指定子命令，默認使用 CLI
-    if args.command is None:
-        args.command = 'cli'
     
     # 處理 API 命令
     if args.command == 'api':
@@ -299,7 +302,7 @@ def main():
         )
         return
     
-    # 處理 CLI 命令
+    # 處理 CLI 命令（包括全局參數）
     # 創建系統實例
     system = StockDataSystem()
     
@@ -310,19 +313,19 @@ def main():
             sys.exit(1)
         
         # 根據參數執行相應操作
-        if hasattr(args, 'init') and args.init:
+        if args.init:
             logger.info("系統初始化完成")
         
-        elif hasattr(args, 'historical') and args.historical is not None:
+        elif args.historical is not None:
             system.fetch_historical_data(args.historical)
         
-        elif hasattr(args, 'daily') and args.daily is not None:
+        elif args.daily is not None:
             system.fetch_daily_data(args.daily)
         
-        elif hasattr(args, 'update_info') and args.update_info is not None:
+        elif args.update_info is not None:
             system.update_stock_info(args.update_info)
         
-        elif hasattr(args, 'daemon') and args.daemon:
+        elif args.daemon:
             system.run_daemon()
         
         else:
