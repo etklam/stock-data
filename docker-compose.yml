@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 資料庫
+  postgres:
+    image: postgres:15-alpine
+    container_name: stocks-data-postgres
+    environment:
+      POSTGRES_DB: stocks_data
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=C"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - stocks-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stocks_data"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Stock Data API 服務
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stocks-data-api
+    environment:
+      # 資料庫配置（優先使用環境變數）
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: stocks_data
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+
+      # API 配置
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      API_RELOAD: "false"
+      API_WORKERS: 4
+
+      # 排程器配置
+      SCHEDULER_ENABLED: "true"
+      SCHEDULER_DAILY_FETCH_TIME: "18:00"
+
+      # 日誌配置
+      LOG_LEVEL: INFO
+
+      # Yahoo Finance 配置
+      YAHOO_FETCH_INTERVAL: "300"
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # 掛載日誌目錄
+      - ./logs:/app/logs
+      # 掛載配置文件（可選，用於開發時修改配置）
+      - ./config.yaml:/app/config.yaml
+    networks:
+      - stocks-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Waiting for PostgreSQL...' &&
+        until PGPASSWORD=$${DATABASE_PASSWORD} psql -h postgres -U $${DATABASE_USER} -d $${DATABASE_NAME} -c 'SELECT 1' > /dev/null 2>&1; do
+          echo 'PostgreSQL is unavailable - sleeping'
+          sleep 2
+        done &&
+        echo 'PostgreSQL is up - starting API server' &&
+        uvicorn api_server:app --host 0.0.0.0 --port 8000 --workers 4
+      "
+
+  # Adminer（資料庫管理工具）- 可選
+  adminer:
+    image: adminer:latest
+    container_name: stocks-data-adminer
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    networks:
+      - stocks-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    profiles:
+      - admin  # 使用 docker-compose --profile admin up 來啟動
+
+networks:
+  stocks-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
