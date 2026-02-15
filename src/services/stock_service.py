@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class StockService:
     """股票信息服務"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化股票服務"""
         self.stock_repository = StockRepository()
     

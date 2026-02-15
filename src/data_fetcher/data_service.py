@@ -44,8 +44,14 @@ class DataFetchService:
                     logger.error(f"無法獲取股票信息: {symbol}")
                     return False
                 
+                # 創建服務實例
+                stock_service = StockService()
+                
+                # 從 stock_info 中移除 symbol，避免重複傳遞
+                stock_data = {k: v for k, v in stock_info.items() if k != 'symbol'}
+                
                 # 存儲到數據庫
-                StockService.create_or_update_stock(session, symbol, **stock_info)
+                stock_service.create_or_update_stock(session, symbol, **stock_data)
                 
                 logger.info(f"股票信息存儲成功: {symbol}")
                 return True
@@ -102,11 +108,15 @@ class DataFetchService:
             
             # 存儲到數據庫
             with db_manager.session_scope() as session:
-                saved_count = StockPriceService.save_stock_prices(session, symbol, price_data)
+                # 創建服務實例
+                price_service = StockPriceService()
+                log_service = DataFetchLogService()
+                
+                saved_count = price_service.save_stock_prices(session, symbol, price_data)
                 
                 # 記錄日誌
                 execution_time = time.time() - start_time
-                DataFetchLogService.create_log(
+                log_service.create_log(
                     session,
                     fetch_type='historical',
                     symbol=symbol,
@@ -127,7 +137,8 @@ class DataFetchService:
             # 記錄錯誤日誌
             try:
                 with db_manager.session_scope() as session:
-                    DataFetchLogService.create_log(
+                    log_service = DataFetchLogService()
+                    log_service.create_log(
                         session,
                         fetch_type='historical',
                         symbol=symbol,
@@ -162,10 +173,14 @@ class DataFetchService:
             
             # 存儲到數據庫
             with db_manager.session_scope() as session:
-                saved_count = StockPriceService.save_stock_prices(session, symbol, [price_info])
+                # 創建服務實例
+                price_service = StockPriceService()
+                log_service = DataFetchLogService()
+                
+                saved_count = price_service.save_stock_prices(session, symbol, [price_info])
                 
                 # 記錄日誌
-                DataFetchLogService.create_log(
+                log_service.create_log(
                     session,
                     fetch_type='daily',
                     symbol=symbol,
@@ -180,7 +195,8 @@ class DataFetchService:
             # 記錄錯誤日誌
             try:
                 with db_manager.session_scope() as session:
-                    DataFetchLogService.create_log(
+                    log_service = DataFetchLogService()
+                    log_service.create_log(
                         session,
                         fetch_type='daily',
                         symbol=symbol,

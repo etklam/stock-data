@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class ConfigService:
     """系統配置服務"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化配置服務"""
         self.config_repository = ConfigRepository()
     

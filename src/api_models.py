@@ -67,6 +67,72 @@ class BatchRequest(BaseModel):
     symbols: List[str] = Field(..., description="List of stock symbols")
 
 
+# ==================== Database Query Models ====================
+
+class StockQueryRequest(BaseModel):
+    """Request model for querying stock data from database"""
+    symbol: str = Field(..., description="Stock symbol (e.g., AAPL, MSFT)")
+    include_info: bool = Field(True, description="Whether to include stock basic info")
+    include_prices: bool = Field(True, description="Whether to include price data")
+    start_date: Optional[date] = Field(None, description="Start date for price data")
+    end_date: Optional[date] = Field(None, description="End date for price data")
+    limit: Optional[int] = Field(100, description="Maximum number of price records to return")
+
+
+class StockQueryResponse(BaseModel):
+    """Response for stock data query from database"""
+    symbol: str
+    found: bool
+    stock_info: Optional[StockResponse] = None
+    prices: List[StockPriceResponse] = []
+    total_price_records: int = 0
+    message: Optional[str] = None
+
+
+# ==================== Yahoo Fetch Models ====================
+
+class YahooFetchRequest(BaseModel):
+    """Request model for fetching data from Yahoo Finance"""
+    symbol: str = Field(..., description="Stock symbol (e.g., AAPL, MSFT)")
+    fetch_info: bool = Field(True, description="Whether to fetch stock basic info")
+    fetch_historical: bool = Field(True, description="Whether to fetch historical price data")
+    start_date: Optional[date] = Field(None, description="Start date for historical data (default: 1 year ago)")
+    end_date: Optional[date] = Field(None, description="End date for historical data (default: today)")
+
+
+class YahooFetchResponse(BaseModel):
+    """Response for Yahoo Finance data fetch operation"""
+    symbol: str
+    success: bool
+    info_fetched: bool = False
+    historical_fetched: bool = False
+    records_count: int = 0
+    message: Optional[str] = None
+    error: Optional[str] = None
+
+
+# ==================== Legacy Models (for backward compatibility) ====================
+
+class StockDataRequest(BaseModel):
+    """Legacy request model for backward compatibility"""
+    symbol: str = Field(..., description="Stock symbol (e.g., AAPL, MSFT)")
+    start_date: Optional[date] = Field(None, description="Start date for historical data (default: 1 year ago)")
+    end_date: Optional[date] = Field(None, description="End date for historical data (default: today)")
+    include_info: bool = Field(True, description="Whether to fetch stock basic info")
+    include_historical: bool = Field(True, description="Whether to fetch historical price data")
+
+
+class StockDataResponse(BaseModel):
+    """Legacy response model for backward compatibility"""
+    symbol: str
+    success: bool
+    info_fetched: bool = False
+    historical_fetched: bool = False
+    records_count: int = 0
+    message: Optional[str] = None
+    error: Optional[str] = None
+
+
 class FetchHistoryResponse(BaseModel):
     """Response for historical data fetch operation"""
     symbol: str

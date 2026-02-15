@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class LogService:
     """數據獲取日誌服務"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化日誌服務"""
         self.log_repository = LogRepository()
     

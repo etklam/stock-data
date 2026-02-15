@@ -6,7 +6,7 @@
 
 import yaml
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -40,7 +40,7 @@ class ConfigManager:
         'api.workers': 'API_WORKERS',
     }
 
-    def __init__(self, config_path: str = "config.yaml", env_file: str = ".env"):
+    def __init__(self, config_path: str = "config.yaml", env_file: str = ".env", load_env: bool = True):
         """
         初始化配置管理器
 
@@ -50,8 +50,10 @@ class ConfigManager:
         """
         self.config_path = Path(config_path)
         self.env_file = Path(env_file)
-        self._config = None
-        self._load_env()
+        self.load_env = load_env
+        self._config: Optional[Dict[str, Any]] = None
+        if self.load_env:
+            self._load_env()
         self._load_config()
     
     def _load_env(self) -> None:
@@ -72,7 +74,7 @@ class ConfigManager:
             self._apply_env_overrides()
 
         except Exception as e:
-            raise Exception(f"加載配置文件失敗: {e}")
+            raise RuntimeError(f"加載配置文件失敗: {e}") from e
 
     def _apply_env_overrides(self) -> None:
         """應用環境變數覆蓋配置值"""
@@ -107,7 +109,8 @@ class ConfigManager:
                 return float(value)
             return int(value)
         except ValueError:
-            pass
+            return value
+
 
         # 字符串
         return value

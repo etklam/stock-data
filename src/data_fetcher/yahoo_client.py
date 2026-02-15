@@ -37,7 +37,7 @@ class YahooFinanceClient:
             ticker = yf.Ticker(symbol)
             info = ticker.info
             
-            # 提取有用的信息
+            # 提取有用的信息（只包含 Stock 模型中存在的字段）
             stock_info = {
                 'symbol': symbol,
                 'name': info.get('longName', info.get('shortName', '')),
@@ -45,8 +45,6 @@ class YahooFinanceClient:
                 'sector': info.get('sector', ''),
                 'industry': info.get('industry', ''),
                 'market_cap': info.get('marketCap', 0),
-                'currency': info.get('currency', 'USD'),
-                'country': info.get('country', ''),
             }
             
             logger.info(f"獲取股票信息成功: {symbol}")

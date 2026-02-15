@@ -24,6 +24,9 @@ from src.api_models import (
     StockResponse, StockPriceResponse, StockPriceSummary,
     HistoricalDataRequest, DailyDataRequest, BatchRequest,
     FetchHistoryResponse, FetchDailyResponse, BatchFetchResponse,
+    StockDataRequest, StockDataResponse,
+    StockQueryRequest, StockQueryResponse,
+    YahooFetchRequest, YahooFetchResponse,
     QueryParams, DataFetchLogResponse, HealthResponse, ErrorResponse
 )
 
@@ -277,7 +280,146 @@ async def get_batch_prices(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== Database Query Endpoints ====================
+
+@app.post("/api/v1/query/stock", response_model=StockQueryResponse, tags=["Database Query"])
+async def query_stock_data(request: StockQueryRequest):
+    """
+    Query stock data from database
+    
+    Retrieves stock information and price data from the local database.
+    Does not fetch data from external sources.
+    """
+    try:
+        symbol = request.symbol.upper()
+        stock_info = None
+        prices = []
+        
+        with db_manager.session_scope() as session:
+            # 查詢股票基本信息
+            if request.include_info:
+                stock_service = StockService()
+                stock = stock_service.get_stock_by_symbol(session, symbol)
+                if stock:
+                    stock_info = StockResponse.from_orm(stock)
+            
+            # 查詢價格資料
+            if request.include_prices:
+                price_service = StockPriceService()
+                if request.start_date and request.end_date:
+                    prices = price_service.get_prices_by_date_range(
+                        session, symbol, request.start_date, request.end_date
+                    )
+                elif request.start_date:
+                    prices = price_service.get_prices_by_date_range(
+                        session, symbol, request.start_date, date.today()
+                    )
+                else:
+                    # 獲取最新價格
+                    latest = price_service.get_latest_price(session, symbol)
+                    prices = [latest] if latest else []
+                
+                # 應用限制
+                prices = prices[:request.limit]
+            
+            # 轉換為響應模型
+            price_responses = [StockPriceResponse.from_orm(price) for price in prices]
+            
+            found = stock_info is not None or len(price_responses) > 0
+            
+            return StockQueryResponse(
+                symbol=symbol,
+                found=found,
+                stock_info=stock_info,
+                prices=price_responses,
+                total_price_records=len(price_responses),
+                message=f"Found data for {symbol}" if found else f"No data found for {symbol}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Error querying stock data for {request.symbol}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== Data Fetching Endpoints ====================
+
+@app.post("/api/v1/fetch/yahoo", response_model=YahooFetchResponse, tags=["Data Fetch"])
+async def fetch_from_yahoo(request: YahooFetchRequest):
+    """
+    Fetch stock data from Yahoo Finance and store in database
+    
+    Retrieves stock information and historical price data from Yahoo Finance API
+    and stores them in the local database.
+    """
+    try:
+        symbol = request.symbol.upper()
+        info_success = False
+        historical_success = False
+        records_count = 0
+        error_message = None
+        
+        # 計算默認日期範圍（過去1年）
+        from datetime import timedelta
+        if not request.start_date:
+            start_date = (datetime.now() - timedelta(days=365)).date()
+        else:
+            start_date = request.start_date
+            
+        if not request.end_date:
+            end_date = datetime.now().date()
+        else:
+            end_date = request.end_date
+        
+        # 獲取股票基本信息
+        if request.fetch_info:
+            try:
+                info_success = data_service.fetch_and_store_stock_info(symbol)
+                if not info_success:
+                    error_message = f"Failed to fetch stock info for {symbol}"
+            except Exception as e:
+                error_message = f"Error fetching stock info: {str(e)}"
+                logger.error(f"Error fetching stock info for {symbol}: {e}")
+        
+        # 獲取歷史價格數據
+        if request.fetch_historical and not error_message:
+            try:
+                start_str = start_date.isoformat()
+                end_str = end_date.isoformat()
+                historical_success, records_count = data_service.fetch_and_store_historical_data(
+                    symbol, start_str, end_str
+                )
+                if not historical_success:
+                    if not error_message:
+                        error_message = f"Failed to fetch historical data for {symbol}"
+            except Exception as e:
+                error_message = f"Error fetching historical data: {str(e)}"
+                logger.error(f"Error fetching historical data for {symbol}: {e}")
+        
+        # 判斷整體成功狀態
+        overall_success = (info_success or not request.fetch_info) and \
+                         (historical_success or not request.fetch_historical)
+        
+        return YahooFetchResponse(
+            symbol=symbol,
+            success=overall_success,
+            info_fetched=info_success,
+            historical_fetched=historical_success,
+            records_count=records_count,
+            message=f"Yahoo data fetch completed for {symbol}",
+            error=error_message
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in fetch_from_yahoo: {e}")
+        return YahooFetchResponse(
+            symbol=request.symbol.upper(),
+            success=False,
+            info_fetched=False,
+            historical_fetched=False,
+            records_count=0,
+            error=f"Unexpected error: {str(e)}"
+        )
+
 
 @app.post("/api/v1/fetch/historical", response_model=FetchHistoryResponse, tags=["Data Fetch"])
 async def fetch_historical_data(
@@ -310,6 +452,87 @@ async def fetch_historical_data(
         records_count=0,
         message="Historical data fetch task started in background"
     )
+
+
+# ==================== Legacy Endpoint (for backward compatibility) ====================
+
+@app.post("/api/v1/fetch/stock", response_model=StockDataResponse, tags=["Data Fetch"])
+async def fetch_complete_stock_data_legacy(request: StockDataRequest):
+    """
+    Legacy endpoint for fetching complete stock data (info + historical)
+    
+    DEPRECATED: Use /api/v1/fetch/yahoo instead.
+    Fetches both stock basic information and historical price data from Yahoo Finance.
+    This operation runs synchronously and returns the actual results.
+    """
+    try:
+        symbol = request.symbol.upper()
+        info_success = False
+        historical_success = False
+        records_count = 0
+        error_message = None
+        
+        # 計算默認日期範圍（過去1年）
+        from datetime import timedelta
+        if not request.start_date:
+            start_date = (datetime.now() - timedelta(days=365)).date()
+        else:
+            start_date = request.start_date
+            
+        if not request.end_date:
+            end_date = datetime.now().date()
+        else:
+            end_date = request.end_date
+        
+        # 獲取股票基本信息
+        if request.include_info:
+            try:
+                info_success = data_service.fetch_and_store_stock_info(symbol)
+                if not info_success:
+                    error_message = f"Failed to fetch stock info for {symbol}"
+            except Exception as e:
+                error_message = f"Error fetching stock info: {str(e)}"
+                logger.error(f"Error fetching stock info for {symbol}: {e}")
+        
+        # 獲取歷史價格數據
+        if request.include_historical and not error_message:
+            try:
+                start_str = start_date.isoformat()
+                end_str = end_date.isoformat()
+                historical_success, records_count = data_service.fetch_and_store_historical_data(
+                    symbol, start_str, end_str
+                )
+                if not historical_success:
+                    if not error_message:
+                        error_message = f"Failed to fetch historical data for {symbol}"
+            except Exception as e:
+                error_message = f"Error fetching historical data: {str(e)}"
+                logger.error(f"Error fetching historical data for {symbol}: {e}")
+        
+        # 判斷整體成功狀態
+        overall_success = (info_success or not request.include_info) and \
+                         (historical_success or not request.include_historical)
+        
+        return StockDataResponse(
+            symbol=symbol,
+            success=overall_success,
+            info_fetched=info_success,
+            historical_fetched=historical_success,
+            records_count=records_count,
+            message=f"Stock data fetch completed for {symbol}",
+            error=error_message
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in fetch_complete_stock_data_legacy: {e}")
+        return StockDataResponse(
+            symbol=request.symbol.upper(),
+            success=False,
+            info_fetched=False,
+            historical_fetched=False,
+            records_count=0,
+            error=f"Unexpected error: {str(e)}"
+        )
 
 
 @app.post("/api/v1/fetch/daily", response_model=FetchDailyResponse, tags=["Data Fetch"])

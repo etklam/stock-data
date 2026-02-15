@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class PriceService:
     """股票價格服務"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化價格服務"""
         self.price_repository = PriceRepository()
     
@@ -35,19 +35,34 @@ class PriceService:
             saved_count = 0
             
             for data in price_data:
+                # 處理欄位映射：adj_close_price -> adj_close
+                mapped_data = data.copy()
+                if 'adj_close_price' in mapped_data:
+                    mapped_data['adj_close'] = mapped_data.pop('adj_close_price')
+                
+                # 確保數據中有正確的 symbol
+                mapped_data['symbol'] = symbol
+                
+                # 處理日期類型轉換：date -> datetime
+                if hasattr(mapped_data['date'], 'strftime'):
+                    # 如果是 date 對象，轉換為 datetime
+                    from datetime import datetime
+                    if isinstance(mapped_data['date'], date) and not isinstance(mapped_data['date'], datetime):
+                        mapped_data['date'] = datetime.combine(mapped_data['date'], datetime.min.time())
+                
                 # 檢查是否已存在相同日期的數據
                 existing_price = self.price_repository.get_by_symbol_and_date(
-                    session, symbol, data['date']
+                    session, symbol, mapped_data['date']
                 )
                 
                 if existing_price:
                     # 更新現有記錄
-                    self.price_repository.update(session, existing_price, **data)
-                    logger.debug(f"更新股票價格: {symbol} {data['date']}")
+                    self.price_repository.update(session, existing_price, **mapped_data)
+                    logger.debug(f"更新股票價格: {symbol} {mapped_data['date']}")
                 else:
                     # 創建新記錄
-                    self.price_repository.create(session, symbol=symbol, **data)
-                    logger.debug(f"創建股票價格: {symbol} {data['date']}")
+                    self.price_repository.create(session, **mapped_data)
+                    logger.debug(f"創建股票價格: {symbol} {mapped_data['date']}")
                 
                 saved_count += 1
             
@@ -68,16 +83,20 @@ class PriceService:
             價格對象或 None
         """
         try:
-            return self.price_repository.get_latest_by_symbol(session, symbol)
+            price = self.price_repository.get_latest_by_symbol(session, symbol)
+            if price and hasattr(price, 'date') and isinstance(price.date, datetime):
+                # 轉換 datetime 為 date 以保持向後相容性
+                price.date = price.date.date()
+            return price
         except Exception as e:
             logger.error(f"獲取股票最新價格失敗: {e}")
             return None
     
     def get_prices_by_date_range(
-        self, 
-        session: Session, 
-        symbol: str, 
-        start_date: date, 
+        self,
+        session: Session,
+        symbol: str,
+        start_date: date,
         end_date: date
     ) -> List[object]:
         """
@@ -93,9 +112,14 @@ class PriceService:
             價格列表
         """
         try:
-            return self.price_repository.get_by_symbol_and_date_range(
+            prices = self.price_repository.get_by_symbol_and_date_range(
                 session, symbol, start_date, end_date
             )
+            # 轉換 datetime 為 date 以保持向後相容性
+            for price in prices:
+                if hasattr(price, 'date') and isinstance(price.date, datetime):
+                    price.date = price.date.date()
+            return prices
         except Exception as e:
             logger.error(f"獲取指定日期範圍的價格數據失敗: {e}")
             return []
@@ -126,3 +150,42 @@ class PriceService:
         except Exception as e:
             logger.error(f"獲取多個股票的價格數據失敗: {e}")
             return []
+
+    def get_prices_by_symbol(self, session: Session, symbol: str) -> List[object]:
+        """
+        根據股票代碼獲取所有價格數據
+        
+        Args:
+            session: 數據庫會話
+            symbol: 股票代碼
+            
+        Returns:
+            價格數據列表
+        """
+        try:
+            prices = self.price_repository.get_by_symbol(session, symbol)
+            # 轉換 datetime 為 date 以保持向後相容性
+            for price in prices:
+                if hasattr(price, 'date') and isinstance(price.date, datetime):
+                    price.date = price.date.date()
+            return prices
+        except Exception as e:
+            logger.error(f"獲取股票價格數據失敗: {e}")
+            return []
+
+    def delete_prices_by_symbol(self, session: Session, symbol: str) -> int:
+        """
+        刪除指定股票的所有價格數據
+        
+        Args:
+            session: 數據庫會話
+            symbol: 股票代碼
+            
+        Returns:
+            刪除的記錄數
+        """
+        try:
+            return self.price_repository.delete_by_symbol(session, symbol)
+        except Exception as e:
+            logger.error(f"刪除股票價格數據失敗: {e}")
+            return 0

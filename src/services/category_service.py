@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class CategoryService:
     """股票分類服務"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化分類服務"""
         self.category_repository = CategoryRepository()
     

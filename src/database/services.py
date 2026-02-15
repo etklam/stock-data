@@ -102,9 +102,9 @@ class StockPriceService:
     
     @staticmethod
     def get_prices_by_symbols(
-        session: Session, 
-        symbols: List[str], 
-        start_date: Optional[date] = None, 
+        session: Session,
+        symbols: List[str],
+        start_date: Optional[date] = None,
         end_date: Optional[date] = None
     ) -> List[StockPrice]:
         """獲取多個股票的價格數據"""
@@ -112,6 +112,22 @@ class StockPriceService:
         
         service = PriceService()
         return service.get_prices_by_symbols(session, symbols, start_date, end_date)
+
+    @staticmethod
+    def get_prices_by_symbol(session: Session, symbol: str) -> List[StockPrice]:
+        """根據股票代碼獲取所有價格數據"""
+        from ..services.price_service import PriceService
+        
+        service = PriceService()
+        return service.get_prices_by_symbol(session, symbol)
+
+    @staticmethod
+    def delete_prices_by_symbol(session: Session, symbol: str) -> int:
+        """刪除指定股票的所有價格數據"""
+        from ..services.price_service import PriceService
+        
+        service = PriceService()
+        return service.delete_prices_by_symbol(session, symbol)
 
 
 # 向後相容的 DataFetchLogService 類
