@@ -14,6 +14,7 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 複製 requirements.txt 並安裝 Python 依賴
@@ -30,9 +31,9 @@ RUN mkdir -p /app/logs
 # 暴露 API 服務端口
 EXPOSE 8000
 
-# 健康檢查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
+# 健康檢查 (using curl instead of requests)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # 啟動命令（可透過 docker-compose 覆蓋）
 CMD ["uvicorn", "api_server:app", "--host", "0.0.0.0", "--port", "8000"]

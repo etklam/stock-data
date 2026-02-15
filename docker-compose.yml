@@ -7,6 +7,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: stocks-data-api
+    # Use host network to access Tailscale and external services
+    network_mode: host
     environment:
       # 資料庫配置（使用外部資料庫）
       DATABASE_HOST: ${DATABASE_HOST}
@@ -30,8 +32,6 @@ services:
 
       # Yahoo Finance 配置
       YAHOO_FETCH_INTERVAL: "300"
-    ports:
-      - "${API_PORT:-8000}:8000"
     volumes:
       # 掛載日誌目錄
       - ./logs:/app/logs
