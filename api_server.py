@@ -138,9 +138,11 @@ async def get_all_stocks(
                 if active_only:
                     stocks = StockService.get_all_active_stocks(session)
                 else:
-                    stocks = session.query(StockService.__bases__[0]).all()
+                    from src.database.models import Stock
+                    stocks = session.query(Stock).all()
 
-            return stocks
+            # Convert to Pydantic models within session scope
+            return [StockResponse.model_validate(s) for s in stocks]
     except Exception as e:
         logger.error(f"Error fetching stocks: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -158,7 +160,8 @@ async def get_stock(symbol: str):
             stock = StockService.get_stock_by_symbol(session, symbol.upper())
             if not stock:
                 raise HTTPException(status_code=404, detail=f"Stock {symbol} not found")
-            return stock
+            # Convert to Pydantic model within session scope
+            return StockResponse.model_validate(stock)
     except HTTPException:
         raise
     except Exception as e:
@@ -227,7 +230,8 @@ async def get_stock_prices(
 
             # Apply limit
             prices = prices[:limit]
-            return prices
+            # Convert to Pydantic models within session scope
+            return [StockPriceResponse.model_validate(p) for p in prices]
     except Exception as e:
         logger.error(f"Error fetching prices for {symbol}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -248,7 +252,8 @@ async def get_latest_price(symbol: str):
                     status_code=404,
                     detail=f"No price data found for stock {symbol}"
                 )
-            return price
+            # Convert to Pydantic model within session scope
+            return StockPriceResponse.model_validate(price)
     except HTTPException:
         raise
     except Exception as e:
@@ -274,7 +279,8 @@ async def get_batch_prices(
             prices = StockPriceService.get_prices_by_symbols(
                 session, symbols_upper, start_date, end_date
             )
-            return prices[:limit]
+            # Convert to Pydantic models within session scope
+            return [StockPriceResponse.model_validate(p) for p in prices[:limit]]
     except Exception as e:
         logger.error(f"Error fetching batch prices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -718,7 +724,8 @@ async def get_fetch_logs(
     try:
         with db_manager.session_scope() as session:
             logs = DataFetchLogService.get_recent_logs(session, limit, status)
-            return logs
+            # Convert to Pydantic models within session scope
+            return [DataFetchLogResponse.model_validate(log) for log in logs]
     except Exception as e:
         logger.error(f"Error fetching logs: {e}")
         raise HTTPException(status_code=500, detail=str(e))
